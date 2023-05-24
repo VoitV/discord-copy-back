@@ -22,6 +22,7 @@ export const getRandomVerifyArticles = async (req,res) => {
 
 export const createVerifyArticle = async (req,res) => {
     const { articleTitle, articleType, articleContent } = req.body;
+    console.log(articleTitle, articleContent, articleType);
     const sql = "insert into VerifyArticles (articletitle,articletype,articlecontent) VALUES ($1,$2,$3) RETURNING *"
     const article = (await db.query(sql,[articleTitle,articleType,articleContent])).rows;
     res.json({article});
