@@ -14,7 +14,7 @@ app.use(bodyParser.json());
 app.use('/api/v1',verifyArticlesRouter);
 app.use((err, req, res, next) => {
   console.log(err);
-    res.status(500).send('Something broke!',err)
+    res.status(500).send('Something broke!')
   })
 
 app.listen(PORT,()=> {
