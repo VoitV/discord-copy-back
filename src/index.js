@@ -11,10 +11,6 @@ app.use(express.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
-app.use('/',(req,res) => {
-  res.json('ok')
-})
-
 app.use('/api/v1',verifyArticlesRouter);
 app.use((err, req, res, next) => {
   console.log(err);
