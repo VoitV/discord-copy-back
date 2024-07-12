@@ -1,7 +1,7 @@
-import express from "express"
+import express from "express";
 import cors from 'cors';
-import { verifyArticlesRouter } from "./entities/verifyArticles/routes/verifyArticlesRoute.js";
 import bodyParser from 'body-parser';
+import { userRouter } from "./entities/User/routes.js";
 
 const PORT = process.env.PORT || 3000;
 
@@ -11,12 +11,13 @@ app.use(express.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
-app.use('/api/v1',verifyArticlesRouter);
-app.use((err, req, res, next) => {
-  console.log(err);
-    res.status(500).send(err)
-  })
 
-app.listen(PORT,()=> {
-    console.log('server star on ', PORT)
-})
+
+app.use('/api/v1', userRouter);
+
+
+app.listen(PORT, () => {
+    console.log('Server started on port', PORT);
+});
+
+export default app;

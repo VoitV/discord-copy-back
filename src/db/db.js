@@ -1,17 +1,19 @@
-import pg from "pg";
-const { Pool } = pg;
+import knex from "knex";
 
-export const db = new Pool({
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    host: process.env.DB_HOST,
-    port: process.env.DB_PORT,
-    database: process.env.DB_DATABASE,
-    ssl: true,
-  });
+const config = { 
+    client: 'pg',
+    connection: {
+      database: 'bee-farm',
+      user:     'postgres',
+      password: '23062003'
+    },
+    pool: {
+      min: 2,
+      max: 10
+    },
+    migrations: {
+      tableName: 'knex_migrations'
+    }
+};
 
-  
-  db.connect().catch((error) => {
-    console.log('Failed connect to the database ', error);
-  });
-  
+export default knex(config);
