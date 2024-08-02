@@ -15,6 +15,7 @@ export const authMiddleware = (req,res,next) => {
     const authHeaders = req.headers.authorization;
 
 
+
     if(!authHeaders) {
         res.status(401).json({message:'Unathorized'});
     }
