@@ -1,6 +1,5 @@
 import db from '../../db/db.js';
 import bcrypt from 'bcryptjs';
-import { use } from 'chai';
 import jwt from 'jsonwebtoken'
 
 const generateAcessToken = (id) => {
@@ -11,11 +10,17 @@ const generateAcessToken = (id) => {
 }
 
 export const createUser = async (req, res) => {
-    const { login, password } = req.body;
+    const imagesUrl = [
+        'https://i.ibb.co/C3GnswPp/4.png',
+        'https://i.ibb.co/Ps7V4xxd/3.png',
+        'https://i.ibb.co/V6sJHjB/2.png',
+        'https://i.ibb.co/Kc9FV2Sz/image.png'
+    ]
+    const { email, password, pseudonym} = req.body;
 
 
     try {
-        const candidate = await db('user').where({ login }).first();
+        const candidate = await db('user').where({ email}).orWhere({pseudonym}).first();
 
 
         if (candidate) {
@@ -24,14 +29,17 @@ export const createUser = async (req, res) => {
 
         const hashPassword = bcrypt.hashSync(password, 5);
 
-        const user = await db('user').insert({
-            login: login,
-            password: hashPassword
-        }).returning('*').then(data=>data[0])
 
-        const token = generateAcessToken(user.id);
+        // const user = await db('user').insert({
+        //     email: email,
+        //     password: hashPassword,
+        //     avatar: imagesUrl[Math.floor(Math.random()*imagesUrl.length)],
+        //     name: name,
+        // }).returning('*').then(data=>data[0])
+        //
+        // const token = generateAcessToken(user.id);
 
-        res.json(token);
+        res.json('ok');
     } catch (error) {
         console.log(error)
         res.status(500).json({ message: 'Internal server error', errorCode: 500 });
@@ -40,19 +48,21 @@ export const createUser = async (req, res) => {
 
 
 export const loginUser = async (req,res) => {
-    const { login, password  } = req.body;
-    const user = await db.select('*').from("user").where({login}).then(data=> data[0]);
+    const { email, password  } = req.body;
+
+    const user = await db.select('*').from("user").where({email}).then(data=> data[0]);
+
 
     if(!user) {
         return res.status(400).json({message:'User not found',errorCode:400})
     }
 
 
-    const validPassword = bcrypt.compareSync(password,user.password);
-
-    if(!validPassword) {
-        return res.status(400).json({message:'Passwornd is not valid',errorCode:400})
-    }
+    // const validPassword = bcrypt.compareSync(password,user.password);
+    //
+    // if(!validPassword) {
+    //     return res.status(400).json({message:'Passwornd is not valid',errorCode:400})
+    // }
 
 
     const token = generateAcessToken(user.id)
@@ -62,327 +72,193 @@ export const loginUser = async (req,res) => {
 
 export const getUser = async (req,res) => {
 
-    if(!req.user) {
-        return res.status(400).json({message:'User not found',errorCode:400})
-    }
+    const user_id = req.params.id;
 
-    const user_id = req.user.id;
-    
-    const user = await db.select('*').from("user").where({user_id}).then(data=>(data[0]))
+    const user = await db.select('*').from('user').where({'id':user_id}).first();
 
     res.json(user)
 }
 
 export const getUsers = async (req,res) => {
-    const users = await db.select('*').from("user");
+    const users = await db.select('*').from("user").orderBy('id');
 
     res.json(users);
 }
 
-export const getUserBalance = async (req, res) => {
-    if (!req.user) {
-        return res.status(400).json({ message: 'User not found', errorCode: 400 });
+export const getUserFriend = async (req,res) => {
+    const user = req.user;
+
+    console.log(user);
+
+    if(!user) {
+        return res.status(400).json({message:'User not found',errorCode:400})
     }
 
-    const id = req.user.id;
+    const user_friends_relation = await db.select('*')
+        .from("user_friend")
+        .where({user_one:user.id})
+        .orWhere({user_two:user.id})
 
-    try {
-        const user = await db.select('*').from("user").where({ id }).first();
-        if (!user) {
-            return res.status(404).json({ message: 'User not found', errorCode: 404 });
+    const user_friends_id = [];
+
+    user_friends_relation.forEach(userCheck => {
+        if(userCheck.user_one === user.id && userCheck.user_two !== user.id) {
+            user_friends_id.push(userCheck.user_two);
+        }else {
+            user_friends_id.push(userCheck.user_one);
         }
-        return user.balance;
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ message: 'Internal server error', errorCode: 500 });
-    }
+    })
+
+    const user_friends = await db.select('*').from("user")
+        .whereIn('id', user_friends_id)
+
+    res.json(user_friends)
 }
 
-export const getUserBalanceSync = async (req, res) => {
-    if (!req.user) {
-        return res.status(400).json({ message: 'User not found', errorCode: 400 });
+export const getUserServers = async(req,res) => {
+    const user = req.user;
+
+    if(!user) {
+        return res.status(400).json({message:'User not found',errorCode:400})
     }
 
-    const id = req.user.id;
+    const user_servers = await db.select('server.id', 'server.title', 'server.icon').from("server")
+        .leftJoin('user_server', 'server.id', 'user_server.server_id')
+        .where('user_server.user_id', user.id)
 
-    try {
-        const user = await db.select('*').from("user").where({ id }).first();
-        if (!user) {
-            return res.status(404).json({ message: 'User not found', errorCode: 404 });
-        }
-        res.json(user.balance);
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ message: 'Internal server error', errorCode: 500 });
-    }
+    res.json(user_servers);
 }
 
-export const getUserIncome = async (req, res) => {
-    if (!req.user) {
-        return res.status(400).json({ message: 'User not found', errorCode: 400 });
+export const addUserServer = async (req,res) => {
+    const user = req.user;
+    const {server_id} = req.body;
+
+    if(!user) {
+        return res.status(400).json({message:'User not found',errorCode:400})
     }
 
-    const id = req.user.id;
+    const server = await db.select('*').from("server").where({'id':server_id}).first();
 
-    try {
-        const user = await db.select('*').from("user").where({ id }).first();
-        if (!user) {
-            return res.status(404).json({ message: 'User not found', errorCode: 404 });
-        }
-        return user.income;
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ message: 'Internal server error', errorCode: 500 });
+    if(!server) {
+        return res.status(400).json({message:'Server not found',errorCode:400})
     }
+
+
+    if(!server.is_public) {
+        return res.status(400).json({message:'Server is private',errorCode:400})
+    }
+
+    const addedServer = await db("user_server").insert({
+        server_id:server.id,
+        user_id: user.id,
+    }).returning("server_id");
+
+
+    res.json(addedServer)
 }
 
-export const getUserGameInfo = async (req, res) => {
-    try {
-        const balancePromise = getUserBalance(req, res);
-        const incomePromise = getUserIncome(req, res);
+export const getUserChatMessages = async(req,res) => {
+    const user_one = +req.user.id;
+    const user_two = +req.params.user_id;
 
-        const [balance, income] = await Promise.all([balancePromise, incomePromise]);
+    const chat = await db.select('id').from("user_chat").where({user_one,user_two}).first();
 
-        if (typeof balance === 'number' && typeof income === 'number') {
-            return res.json({ balance, income });
-        }
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ message: 'Internal server error', errorCode: 500 });
-    }
-}
-
-export const changeBalance = async (req, res) => {
-    if (!req.user) {
-        return res.status(400).json({ message: 'User not found', errorCode: 400 });
-    }
-
-    const id = req.user.id;
-    const { operation, number } = req.body;
-
-    if (!operation || typeof number !== 'number') {
-        return res.status(400).json({ message: 'Invalid operation or number', errorCode: 400 });
-    }
+    if(!chat) {
+        const isFriends = await db("user_friend").where({user_one,user_two}).first();
 
 
-
-    try {
-        const userBalance = await getUserBalance(req, res);
-
-        if (operation === 'subtract' && userBalance - number <= 0) {
-            console.log(userBalance)
-            return res.status(402).json({ message: 'Insufficient balance', errorCode: 402 });
-        }        
-
-        let newUserBalance;
-
-        switch (operation) {
-            case 'add':
-                newUserBalance = userBalance + number;
-                break;
-            case 'subtract':
-                newUserBalance = userBalance - number;
-                break;
-            default:
-                return res.status(400).json({ message: 'Invalid operation', errorCode: 400 });
+        if(!isFriends) {
+            return res.status(400).json({message:'Users not friends',errorCode:400})
         }
 
-
-        await db('user').where({ id }).update({ balance: newUserBalance });
-
-        return res.json({ balance: newUserBalance });
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ message: 'Internal server error', errorCode: 500 });
-    }
-}
-
-export const getBeesRaresList = async (req,res) => {
-    res.json(await db.select('*').from('bee_rare'));
-}
-
-export const getBeePrice = async (req,res) => {
-    const {id} = req.body;
-    
-    res.json(await db.select('price').from('bee_rare').where({id}))
-}
-
-export const getRandomBee= async (req, res) => {
-    if (!req.user) {
-        return res.status(400).json({ message: 'User not found', errorCode: 400 });
+        const createdChat = await db("user_chat").insert({user_one, user_two});
     }
 
+    const messages = await db
+        .select(
+            'user_chat_message.id',
+            'user_chat_message.chat_id',
+            'user_chat_message.user_id',
+            'user_chat_message.message',
+            'user_chat_message.created_at',
+            'user.name',
+            'user.pseudonym',
+            'user.title_status',
+            'user.online_status',
+            'user.avatar'
+        )
+        .from('user_chat_message')
+        .leftJoin('user', 'user.id', 'user_chat_message.user_id')
+        .where({ chat_id: chat.id })
+        .orderBy('user_chat_message.created_at', 'esc');
+
+
+    res.json(messages)
+}
+
+export const addUserFriend = async (req, res) => {
+    const user = req.user.id;
+    const { pseudonym } = req.body;
+
+
+    const candidate = await db.select('*').from('user').where({ pseudonym }).first();
+
+    if (!candidate) {
+        return res.status(404).json({ message: 'User not found', errorCode: 404 });
+    }
+
+    const isUserAlreadyFriend = await db
+        .select('*')
+        .from('user_friend')
+        .where({ user_one: candidate.id, user_two: user })
+        .orWhere({ user_one: user, user_two: candidate.id });
+
+    if (isUserAlreadyFriend.length !== 0) {
+        return res.status(400).json({ message: 'User is already in your friend list', errorCode: 400 });
+    }
+
+
+    const check_request = await db("user_friend_request")
+        .select('*')
+        .where({sender_id:user, receiver_id:candidate.id})
+        .first();
+
+    if(check_request) {
+        return res.status(400).json({ message: 'Request already send', errorCode: 400 });
+    }
+
+
+    const request = await db("user_friend_request")
+        .insert({ sender_id: user, receiver_id: candidate.id })
+        .returning("*")
+
+    res.json(request[0])
+};
+
+
+export const getFriendRequests = async (req, res) => {
     const user_id = req.user.id;
 
-    const { rare } = req.body;
 
+    const requestUsersIds = await db('user_friend_request')
+        .pluck('sender_id')
+        .where({ receiver_id: user_id });
 
-    try {
-
-
-
-        // Отримати всі бджоли цього рідкісного типу
-        const beesInThisRare = await db.select(
-            'bee_type.id as bee_type_id',
-            'bee_type.type as bee_type',
-            'bee_rare.id as bee_rare_id',
-            'bee_rare.rare as bee_rare',
-            'bee_type.isdefault as bee_type_is_default'
-        )
-        .from('bee_type')
-        .join('bee_rare', 'bee_type.rare', 'bee_rare.id')
-        .where('bee_rare.id', rare)
-        .andWhere('bee_type.isdefault', true);
-
-
-        if (beesInThisRare.length > 0) {
-            const randomIndex = Math.floor(Math.random() * beesInThisRare.length);
-            const beeTypeId = beesInThisRare[randomIndex].bee_type_id;
-            
-            const randomBee = await db('bee_type')
-              .whereNot({ id: beeTypeId, isdefault:false }) // Вибираємо всі бджоли, крім однієї, що вже вибрана
-              .orderByRaw('RANDOM()') // Використовуємо SQL-функцію для випадкового сортування
-              .first(); // Вибираємо першу з випадкового списку
-            
-            const newUserBee = await db('bee').insert({ user_id, bee_type: randomBee.id }).returning('*');
-            
-            return res.json(newUserBee);
-        } else {
-            return res.status(400).json({ message: "No bees found for the given rare type", errorCode: 400 });
-        }
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ message: "Internal server error", errorCode: 500 });
+    if (requestUsersIds.length === 0) {
+        return [];
     }
+
+    console.log(requestUsersIds)
+
+    const requestUsers = await db('user')
+        .select('*')
+        .whereIn('id', requestUsersIds);
+
+    res.json(requestUsers)
+
 }
 
 
-export const getUserBees = async (req, res) => {
-    if (!req.user) {
-        return res.status(400).json({ message: 'User not found', errorCode: 400 });
-    }
-
-    const userId = req.user.id;
-
-    try {
-        const userBees = await db('bee')
-            .leftJoin('bee_type', 'bee.bee_type', 'bee_type.id')
-            .leftJoin('user', 'bee.user_id', 'user.id')
-            .select('bee.id', 'bee.user_id', 'bee.bee_type', 'bee_type.type', 'bee_type.rare')
-            .where('user.id', userId);
-
-        res.json(userBees);
-    } catch (err) {
-        return res.status(500).json({ message: 'Internal server error', errorCode: 500 });
-    }
-};
 
 
-export const getUserBee = async (req,res) => {
-    if (!req.user) {
-        return res.status(400).json({ message: 'User not found', errorCode: 400 });
-    }
-
-    const userId = req.user.id;
-    const {beeId} = req.body;
-
-
-    try {
-        const userBee = await db('bee')
-        .leftJoin('bee_type', 'bee.bee_type', 'bee_type.id')
-        .leftJoin('user', 'bee.user_id', 'user.id')
-        .select('bee.id', 'bee.user_id', 'bee.bee_type', 'bee_type.type', 'bee_type.rare')
-        .where({
-            'user.id': userId,
-            'bee.id': beeId
-        });
-    
-        res.json(userBee);
-    } catch (err) {
-        return res.status(500).json({ message: 'Internal server error', errorCode: 500 });
-    }
-}
-
-export const upgradeUserBee = async (req, res) => {
-    if (!req.user) {
-        return res.status(400).json({ message: 'User not found', errorCode: 400 });
-    }
-
-    const userId = req.user.id;
-
-    const { firstBeeId, secondBeeId } = req.body;
-
-
-    const bees = await db('bee').select('*').join('bee_type','bee_type.id','bee_type').whereIn('bee.id', [firstBeeId, secondBeeId]);
-
-    const firstBee = bees[0];
-    const secondBee = bees[1];
-
-
-    const createOrFindBee = async (type, rare) => {
-
-        console.log(type,rare)
-
-        const bee = await db('bee_type')
-            .select('*')
-            .where({ type, rare, isdefault: false })
-
-
-        if (bee.length === 0) {
-          return await db('bee_type')
-           .insert({ type, rare, isdefault: false })
-           .returning('*');
-        }
-
-        return bee;
-    };
-
-    const successUpgrade = async () => {
-        const selectedBee = firstBee.type === secondBee.type ? firstBee : [firstBee, secondBee][Math.floor(Math.random() * 2)];
-        const newBeeType = selectedBee.type;
-        const newBeeRare = Math.min(selectedBee.rare + 1, 5);
-
-        console.log(newBeeRare)
-
-        return await createOrFindBee(newBeeType, newBeeRare);   
-    };
-
-    const randomMutation = async () => {
-        if (Math.random() > 0.9) {
-            return createOrFindBee('Пчола звичайна', 1);
-        } else {
-            return successUpgrade();
-        }
-    };
-
-    let result;
-
-    if (firstBee.rare === secondBee.rare) {
-        if (Math.random() < 0.7) {
-            result = await randomMutation();
-            
-        } else {
-            result = 'failed upgrade';
-        }
-    } else {
-        result = 'Bees rare mismatch';
-    }
-
-    if (result !== 'failed upgrade' && result !== 'Bees rare mismatch') {
-        await db('bee')
-            .where({ 'user_id': userId })
-            .whereIn('bee.id', [firstBeeId, secondBeeId])
-            .del();
-
-
-    const beeTypeId = await db('bee_type').select('id').where({type:result[0].type, rare:result[0].rare, isdefault:false}).then(data=>data[0].id)
-
-    const newUseBee = await db('bee').insert({user_id:userId, bee_type:beeTypeId}).returning('*')
-
-    return res.status(200).json({newUseBee});
-    }
-
-
-    return res.status(200).json({ message: 'failed upgrade' });
-};
 

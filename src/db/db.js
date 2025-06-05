@@ -3,7 +3,7 @@ import knex from "knex";
 const config = { 
     client: 'pg',
     connection: {
-      database: 'bee-farm',
+      database: 'discord',
       user:     'postgres',
       password: '23062003'
     },
@@ -11,9 +11,6 @@ const config = {
       min: 2,
       max: 10
     },
-    migrations: {
-      tableName: 'knex_migrations'
-    }
 };
 
 export default knex(config);
